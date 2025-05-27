@@ -2,72 +2,100 @@
 session_start();
 include "db_connect.php";
 
-// Check if payment_id is valid
+// Ensure ID is valid
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header("Location: dashboard-admin.php?msg=" . urlencode("Invalid tenant payment ID."));
     exit;
 }
 
 $payment_id = intval($_GET['id']);
+$action = $_GET['action'] ?? null;
 
-// Step 1: Get tenant username associated with payment
+// Step 1: Fetch payment info
 $query = "SELECT tenant_username FROM payments WHERE payment_id = ?";
 $stmt = mysqli_prepare($conn, $query);
-if (!$stmt) {
-    header("Location: dashboard-admin.php?msg=" . urlencode("DB error (prepare): " . mysqli_error($conn)));
-    exit;
-}
 mysqli_stmt_bind_param($stmt, "i", $payment_id);
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
+$payment = mysqli_fetch_assoc($result);
+mysqli_stmt_close($stmt);
 
-if ($row = mysqli_fetch_assoc($result)) {
-    $tenant_username = $row['tenant_username'];
-    mysqli_stmt_close($stmt);
-
-    // Step 2: Delete from payments table
-    $delete_payment = "DELETE FROM payments WHERE payment_id = ?";
-    $stmt_del_payment = mysqli_prepare($conn, $delete_payment);
-    if (!$stmt_del_payment) {
-        header("Location: dashboard-admin.php?msg=" . urlencode("DB error (prepare delete payment): " . mysqli_error($conn)));
-        exit;
-    }
-    mysqli_stmt_bind_param($stmt_del_payment, "i", $payment_id);
-    if (!mysqli_stmt_execute($stmt_del_payment)) {
-        mysqli_stmt_close($stmt_del_payment);
-        header("Location: dashboard-admin.php?msg=" . urlencode("Error deleting payment: " . mysqli_stmt_error($stmt_del_payment)));
-        exit;
-    }
-    mysqli_stmt_close($stmt_del_payment);
-
-    // Step 3: Check and delete from users table
-    $check_user = "SELECT tenant_username FROM users WHERE tenant_username = ?";
-    $stmt_check = mysqli_prepare($conn, $check_user);
-    mysqli_stmt_bind_param($stmt_check, "s", $tenant_username);
-    mysqli_stmt_execute($stmt_check);
-    $result_check = mysqli_stmt_get_result($stmt_check);
-
-    if (mysqli_num_rows($result_check) > 0) {
-        mysqli_stmt_close($stmt_check);
-        $delete_user = "DELETE FROM users WHERE tenant_username = ?";
-        $stmt_del_user = mysqli_prepare($conn, $delete_user);
-        mysqli_stmt_bind_param($stmt_del_user, "s", $tenant_username);
-        if (mysqli_stmt_execute($stmt_del_user)) {
-            $msg = "✅ Tenant payment and user deleted.";
-        } else {
-            $msg = "⚠️ Payment deleted, but user deletion failed.";
-        }
-        mysqli_stmt_close($stmt_del_user);
-    } else {
-        mysqli_stmt_close($stmt_check);
-        $msg = "✅ Payment deleted. User not found.";
-    }
-
-} else {
-    mysqli_stmt_close($stmt);
-    $msg = "⚠️ Payment record not found.";
+// If no such payment
+if (!$payment) {
+    header("Location: dashboard-admin.php?msg=" . urlencode("Payment record not found."));
+    exit;
 }
 
-header("Location: dashboard-admin.php?msg=" . urlencode($msg));
-exit;
+$tenant_username = $payment['tenant_username'];
+
+// Step 2: Perform deletion if action is confirmed
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_POST['confirm'] === 'payment') {
+        // Delete payment only
+        $stmt = mysqli_prepare($conn, "DELETE FROM payments WHERE payment_id = ?");
+        mysqli_stmt_bind_param($stmt, "i", $payment_id);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+        header("Location: dashboard-admin.php?msg=" . urlencode("✅ Payment deleted successfully."));
+        exit;
+
+    } elseif ($_POST['confirm'] === 'both') {
+        // Delete payment
+        $stmt = mysqli_prepare($conn, "DELETE FROM payments WHERE payment_id = ?");
+        mysqli_stmt_bind_param($stmt, "i", $payment_id);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+
+        // Delete user
+        $stmt = mysqli_prepare($conn, "DELETE FROM users WHERE tenant_username = ?");
+        mysqli_stmt_bind_param($stmt, "s", $tenant_username);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+
+        header("Location: dashboard-admin.php?msg=" . urlencode("✅ Payment and user deleted."));
+        exit;
+    }
+}
+
 ?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Confirm Delete</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: url('bg.png') no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Poppins', sans-serif;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 15px;
+            backdrop-filter: blur(15px);
+            padding: 2rem;
+            margin-top: 5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="glass-card text-center">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete payment for tenant <strong><?= htmlspecialchars($tenant_username) ?></strong>?</p>
+
+        <form method="post">
+            <button type="submit" name="confirm" value="payment" class="btn btn-danger me-2">Delete Payment Only</button>
+            <button type="submit" name="confirm" value="both" class="btn btn-warning me-2">Delete Payment and User</button>
+            <a href="dashboard-admin.php" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

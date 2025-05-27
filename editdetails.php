@@ -16,10 +16,18 @@ $data = mysqli_fetch_assoc($result);
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $tenant = $_POST['tenant'];
-    $amount_due = $_POST['amount_due'];
-    $amount_paid = $_POST['amount_paid'];
+    $amount_due = floatval($_POST['amount_due']);
+    $amount_paid = floatval($_POST['amount_paid']);
     $due_date = $_POST['due_date'];
-    $status = $_POST['status'];
+
+    // Automatically set payment status
+    if ($amount_paid <= 0) {
+        $status = 'UNPAID';
+    } elseif ($amount_paid < $amount_due) {
+        $status = 'PARTIALLY PAID';
+    } else {
+        $status = 'PAID';
+    }
 
     $update = "UPDATE payments SET 
                 tenant_username = '$tenant', 
@@ -59,23 +67,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
         <div class="mb-3">
             <label class="form-label">Amount to Pay</label>
-            <input type="number" name="amount_due" class="form-control" value="<?= $data['amount_due'] ?>" required>
+            <input type="number" step="0.01" name="amount_due" class="form-control" value="<?= $data['amount_due'] ?>" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Amount Paid</label>
-            <input type="number" name="amount_paid" class="form-control" value="<?= $data['amount_paid'] ?>" required>
+            <input type="number" step="0.01" name="amount_paid" class="form-control" value="<?= $data['amount_paid'] ?>" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Due Date</label>
             <input type="date" name="due_date" class="form-control" value="<?= $data['due_date'] ?>" required>
         </div>
         <div class="mb-3">
-            <label class="form-label">Status</label>
-            <select name="status" class="form-control" required>
-                <option value="UNPAID" <?= $data['status'] == 'UNPAID' ? 'selected' : '' ?>>UNPAID</option>
-                <option value="PAID" <?= $data['status'] == 'PAID' ? 'selected' : '' ?>>PAID</option>
-                <option value="PARTIALLY PAID" <?= $data['status'] == 'PARTIALLY PAID' ? 'selected' : '' ?>>PARTIALLY PAID</option>
-            </select>
+            <label class="form-label">Current Status</label>
+            <input type="text" class="form-control" value="<?= htmlspecialchars($data['status']) ?>" readonly>
         </div>
         <button type="submit" class="btn btn-primary">Update Payment</button>
         <button type="button" class="btn btn-secondary" onclick="cancelUpdate()">Cancel</button>

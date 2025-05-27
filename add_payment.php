@@ -4,10 +4,18 @@ include "db_connect.php";
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $room = $_POST['room_number'];
     $tenant = $_POST['tenant_username'];
-    $amount_due = $_POST['amount_due'];
-    $amount_paid = $_POST['amount_paid'];
+    $amount_due = floatval($_POST['amount_due']);
+    $amount_paid = floatval($_POST['amount_paid']);
     $due_date = $_POST['due_date'];
-    $status = $_POST['status'];
+
+    // Auto-determine status
+    if ($amount_paid <= 0) {
+        $status = "UNPAID";
+    } elseif ($amount_paid < $amount_due) {
+        $status = "PARTIALLY PAID";
+    } else {
+        $status = "PAID";
+    }
 
     $sql = "INSERT INTO payments (room_number, tenant_username, amount_due, amount_paid, due_date, status)
             VALUES ('$room', '$tenant', '$amount_due', '$amount_paid', '$due_date', '$status')";
@@ -63,24 +71,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </div>
             <div class="mb-3">
                 <label class="form-label">Amount Due</label>
-                <input type="number" name="amount_due" class="form-control" required>
+                <input type="number" step="0.01" name="amount_due" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label class="form-label">Amount Paid</label>
-                <input type="number" name="amount_paid" class="form-control" required>
+                <input type="number" step="0.01" name="amount_paid" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label class="form-label">Due Date</label>
                 <input type="date" name="due_date" class="form-control" required>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Status</label>
-                <select name="status" class="form-select" required>
-                    <option value="UNPAID">UNPAID</option>
-                    <option value="PARTIALLY PAID">PARTIALLY PAID</option>
-                    <option value="PAID">PAID</option>
-                </select>
-            </div>
+
+            <!-- Optional: show status that will be auto-computed -->
+            <!-- <div class="mb-3">
+                <label class="form-label">Status (auto-calculated)</label>
+                <input type="text" class="form-control" value="Will be set based on payment" readonly>
+            </div> -->
+
             <button type="submit" class="btn btn-primary">Add Payment</button>
             <a href="dashboard-admin.php" class="btn btn-secondary">Back</a>
         </form>

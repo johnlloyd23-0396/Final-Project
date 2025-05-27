@@ -7,9 +7,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = mysqli_real_escape_string($conn, $_POST['tenant_username']);
     $password = mysqli_real_escape_string($conn, $_POST['password']);
     $confirm_password = mysqli_real_escape_string($conn, $_POST['confirm_password']);
+    $landlord_name = trim($_POST['landlord_name']);
 
     if ($password !== $confirm_password) {
         $error_message = "Passwords do not match.";
+    } elseif ($landlord_name !== 'Lerna Buan') {
+        $error_message = "Invalid landlord name. Please enter valid requirement.";
     } else {
         $check_query = "SELECT * FROM users WHERE tenant_username = '$username'";
         $result = mysqli_query($conn, $check_query);
@@ -99,6 +102,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="form-floating mb-3">
           <input type="password" name="confirm_password" class="form-control" id="confirm_password" placeholder="Confirm Password" required>
           <label for="confirm_password">Confirm Password</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input type="text" name="landlord_name" class="form-control" id="landlord_name" placeholder="Landlord Name" required>
+          <label for="landlord_name">Landlord Name</label>
         </div>
         <button type="submit" class="btn btn-register w-100">Register</button>
         <div class="mt-3 text-center">
